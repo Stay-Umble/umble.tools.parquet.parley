@@ -1,0 +1,12 @@
+node_modules
+.npm-cache
+.agents/
+.codex/
+cargo-home-root
+cargo-target
+rust-build-work*
+dist
+src-tauri/target
+.DS_Store
+*.log
+*.parley.tmp

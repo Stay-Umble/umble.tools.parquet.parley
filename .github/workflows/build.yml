@@ -1,0 +1,136 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Test frontend
+        run: npm test
+
+      - name: Test Rust backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: verify
+    runs-on: ${{ matrix.platform }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            platform: windows-latest
+            args: --bundles nsis --ci
+            rustTargets: ""
+          - name: Linux x64
+            platform: ubuntu-22.04
+            args: --bundles deb,appimage --ci
+            rustTargets: ""
+          - name: macOS Apple Silicon
+            platform: macos-latest
+            args: --target aarch64-apple-darwin --bundles dmg --ci
+            rustTargets: aarch64-apple-darwin
+          - name: macOS Intel
+            platform: macos-latest
+            args: --target x86_64-apple-darwin --bundles dmg --ci
+            rustTargets: x86_64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            xdg-utils
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Rust stable
+        if: matrix.rustTargets == ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust stable with target
+        if: matrix.rustTargets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rustTargets }}
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v1
+        with:
+          tauriScript: npm run tauri
+          args: ${{ matrix.args }}
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: parquet-parley-[platform]-[arch]-[bundle]

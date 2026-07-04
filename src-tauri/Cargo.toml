@@ -1,0 +1,30 @@
+[package]
+name = "parquet-parley"
+version = "0.1.0"
+description = "A cross-platform Parquet viewer and transform workspace"
+authors = ["Parquet Parley"]
+license = "MIT"
+repository = "https://github.com/Stay-Umble/umble.tools.parquet.parley"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "parquet_parley_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+duckdb = { version = "1.5.4", features = ["bundled"] }
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3"
