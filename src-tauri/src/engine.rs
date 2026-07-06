@@ -5,7 +5,7 @@ use crate::sql::{
     apply_recipe_to_schema, build_query_parts, quote_identifier, quote_string,
     select_list_for_export, select_list_for_rows, source_sql,
 };
-use duckdb::Connection;
+use duckdb::{Config, Connection};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
@@ -350,9 +350,10 @@ impl ParleyState {
 }
 
 fn open_connection() -> ParleyResult<Connection> {
-    let conn = Connection::open_in_memory()?;
+    let config = Config::default().enable_autoload_extension(false)?;
+    let conn = Connection::open_in_memory_with_flags(config)?;
     conn.execute_batch(
-        "SET preserve_insertion_order = false; SET threads TO 4; SET enable_progress_bar = false;",
+        "LOAD parquet; SET preserve_insertion_order = false; SET threads TO 4; SET enable_progress_bar = false;",
     )?;
     Ok(conn)
 }
@@ -509,10 +510,31 @@ fn schema_fingerprint(columns: &[ColumnSchema]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+
+    struct TestDir {
+        path: PathBuf,
+    }
+
+    impl TestDir {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!("parquet-parley-{}", Uuid::new_v4()));
+            std::fs::create_dir_all(&path).expect("create temp dir");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
 
     fn write_fixture(path: &Path, start: i64, end: i64) {
-        let conn = Connection::open_in_memory().expect("connection");
+        let conn = open_connection().expect("connection");
         let sql = format!(
             "COPY (
                 SELECT
@@ -529,7 +551,7 @@ mod tests {
 
     #[test]
     fn opens_single_parquet_file_and_pages_rows() {
-        let dir = tempdir().expect("tempdir");
+        let dir = TestDir::new();
         let path = dir.path().join("sample.parquet");
         write_fixture(&path, 0, 100);
 
@@ -557,7 +579,7 @@ mod tests {
 
     #[test]
     fn filters_and_exports_parquet() {
-        let dir = tempdir().expect("tempdir");
+        let dir = TestDir::new();
         let path = dir.path().join("sample.parquet");
         let output = dir.path().join("filtered.parquet");
         write_fixture(&path, 0, 30);
@@ -607,7 +629,7 @@ mod tests {
 
     #[test]
     fn loads_project_and_reports_schema_mismatch() {
-        let dir = tempdir().expect("tempdir");
+        let dir = TestDir::new();
         let path = dir.path().join("sample.parquet");
         let project_path = dir.path().join("sample.parley");
         write_fixture(&path, 0, 10);
