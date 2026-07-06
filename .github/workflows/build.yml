@@ -70,7 +70,7 @@ jobs:
         include:
           - name: Windows x64
             platform: windows-latest
-            args: --bundles nsis --ci
+            args: --bundles msi --ci
             rustTargets: ""
           - name: Linux x64
             platform: ubuntu-22.04

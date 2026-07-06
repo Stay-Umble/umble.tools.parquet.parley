@@ -35,7 +35,7 @@ Pop-Location
 
 ## GitHub Builds
 
-GitHub Actions runs only when a version tag is pushed. Each successful run publishes a GitHub Release with Windows, Linux, and macOS app bundles attached.
+GitHub Actions runs only when a version tag is pushed. Each successful run publishes a GitHub Release with a Windows `.msi` installer, Linux `.deb` and `.AppImage` bundles, and macOS `.dmg` bundles attached.
 
 ```powershell
 git tag v0.1.0
