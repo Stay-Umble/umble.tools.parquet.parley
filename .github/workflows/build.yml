@@ -4,10 +4,17 @@ on:
   push:
     branches:
       - main
+    tags:
+      - v*
   pull_request:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag to publish, for example v0.1.0. Leave blank for an artifact-only build.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -65,6 +72,8 @@ jobs:
     name: Build ${{ matrix.name }}
     needs: verify
     runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
 
     strategy:
       fail-fast: false
@@ -128,9 +137,29 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
+        if: ${{ !(startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) }}
         uses: tauri-apps/tauri-action@v1
         with:
           tauriScript: npm run tauri
           args: ${{ matrix.args }}
+          uploadWorkflowArtifacts: true
+          workflowArtifactNamePattern: parquet-parley-[platform]-[arch]-[bundle]
+
+      - name: Publish Tauri release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '') }}
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: npm run tauri
+          args: ${{ matrix.args }}
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          releaseName: Parquet Parley ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
+          releaseBody: Download the app bundle for your operating system from the assets below.
+          releaseCommitish: ${{ github.sha }}
+          releaseDraft: false
+          prerelease: false
+          generateReleaseNotes: true
+          releaseAssetNamePattern: Parquet-Parley-[version]-[platform]-[arch]-[bundle][ext]
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: parquet-parley-[platform]-[arch]-[bundle]

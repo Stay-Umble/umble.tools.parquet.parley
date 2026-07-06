@@ -36,3 +36,12 @@ Pop-Location
 ## GitHub Builds
 
 GitHub Actions runs on pushes and pull requests to `main`, plus manual runs from the Actions tab. Each successful build uploads Windows, Linux, and macOS app bundles as workflow artifacts.
+
+To publish a GitHub Release with installers attached, push a version tag:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+You can also run the workflow manually and enter a release tag such as `v0.1.0`.
