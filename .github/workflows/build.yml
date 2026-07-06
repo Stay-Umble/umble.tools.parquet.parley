@@ -14,21 +14,11 @@ env:
 jobs:
   verify:
     name: Verify
-    runs-on: ubuntu-22.04
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            xdg-utils
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -70,35 +60,13 @@ jobs:
         include:
           - name: Windows x64
             platform: windows-latest
-            args: --bundles msi --ci
+            args: --no-bundle --ci
             rustTargets: ""
-          - name: Linux x64
-            platform: ubuntu-22.04
-            args: --bundles deb,appimage --ci
-            rustTargets: ""
-          - name: macOS Apple Silicon
-            platform: macos-latest
-            args: --target aarch64-apple-darwin --bundles dmg --ci
-            rustTargets: aarch64-apple-darwin
-          - name: macOS Intel
-            platform: macos-latest
-            args: --target x86_64-apple-darwin --bundles dmg --ci
-            rustTargets: x86_64-apple-darwin
+            uploadPlainBinary: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux build dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            xdg-utils
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -140,5 +108,6 @@ jobs:
           prerelease: false
           generateReleaseNotes: true
           releaseAssetNamePattern: Parquet-Parley-[version]-[platform]-[arch]-[bundle][ext]
+          uploadPlainBinary: ${{ matrix.uploadPlainBinary }}
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: parquet-parley-[platform]-[arch]-[bundle]
