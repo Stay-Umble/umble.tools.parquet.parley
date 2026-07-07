@@ -1,4 +1,4 @@
-name: Build
+name: Release
 
 on:
   push:
@@ -10,11 +10,17 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUSTC_WRAPPER: sccache
+  SCCACHE_GHA_ENABLED: "true"
 
 jobs:
-  verify:
-    name: Verify
+  release-windows:
+    name: Release Windows portable EXE
     runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -30,10 +36,15 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Rust compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       - name: Cache Rust build artifacts
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
+          shared-key: windows-x64-release
+          cache-on-failure: true
 
       - name: Install frontend dependencies
         run: npm ci
@@ -44,54 +55,8 @@ jobs:
       - name: Test frontend
         run: npm test
 
-      - name: Test Rust backend
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-
-  build:
-    name: Build ${{ matrix.name }}
-    needs: verify
-    runs-on: ${{ matrix.platform }}
-    permissions:
-      contents: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows x64
-            platform: windows-latest
-            args: --no-bundle --ci
-            rustTargets: ""
-            uploadPlainBinary: true
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install Rust stable
-        if: matrix.rustTargets == ''
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Rust stable with target
-        if: matrix.rustTargets != ''
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rustTargets }}
-
-      - name: Cache Rust build artifacts
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri -> target
-
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Test Rust backend in release mode
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --release
 
       - name: Publish Tauri release
         uses: tauri-apps/tauri-action@v1
@@ -99,15 +64,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: npm run tauri
-          args: ${{ matrix.args }}
+          args: --no-bundle --ci
           tagName: ${{ github.ref_name }}
           releaseName: Parquet Parley ${{ github.ref_name }}
-          releaseBody: Download the app bundle for your operating system from the assets below.
+          releaseBody: Download the portable Windows EXE from the assets below. It does not require admin rights.
           releaseCommitish: ${{ github.sha }}
           releaseDraft: false
           prerelease: false
           generateReleaseNotes: true
           releaseAssetNamePattern: Parquet-Parley-[version]-[platform]-[arch]-[bundle][ext]
-          uploadPlainBinary: ${{ matrix.uploadPlainBinary }}
+          uploadPlainBinary: true
           uploadWorkflowArtifacts: true
           workflowArtifactNamePattern: parquet-parley-[platform]-[arch]-[bundle]
