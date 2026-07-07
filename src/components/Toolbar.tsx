@@ -110,34 +110,39 @@ export function Toolbar({
           </button>
         </div>
 
-        <button
-          type="button"
-          className="icon-button clear-filter-button"
-          title="Clear filters"
-          onClick={onClearFilters}
-          disabled={!filterCount || busy}
-        >
-          <RotateCcw size={18} />
-          {filterCount > 0 ? <span>{filterCount}</span> : null}
-        </button>
+        {filterCount > 0 ? (
+          <button
+            type="button"
+            className="tool-button clear-filter-button"
+            title="Clear active filters"
+            onClick={onClearFilters}
+            disabled={busy}
+          >
+            <RotateCcw size={16} />
+            <span>Clear filters</span>
+          </button>
+        ) : null}
       </div>
 
       <div className="dataset-meter" aria-label="Current dataset summary">
-        <div>
+        <div title="Total source rows">
           <strong>{dataset ? formatCount(dataset.rowCount) : "0"}</strong>
           <span>rows</span>
         </div>
-        <div>
+        <div title="Dataset columns">
           <Columns3 size={14} />
-          <span>{formatCount(columnCount)}</span>
+          <strong>{formatCount(columnCount)}</strong>
+          <span>cols</span>
         </div>
-        <div>
+        <div title="Active filters">
           <Filter size={14} />
-          <span>{formatCount(filterCount)}</span>
+          <strong>{formatCount(filterCount)}</strong>
+          <span>filters</span>
         </div>
-        <div>
+        <div title="Computed transforms in the recipe">
           <Sparkles size={14} />
-          <span>{formatCount(transformCount)}</span>
+          <strong>{formatCount(transformCount)}</strong>
+          <span>recipe</span>
         </div>
       </div>
     </header>

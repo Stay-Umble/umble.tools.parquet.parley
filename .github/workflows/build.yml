@@ -36,6 +36,31 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Sync app version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+([\-+][0-9A-Za-z.-]+)?$') {
+            throw "Tag '${{ github.ref_name }}' does not look like a SemVer version tag such as v0.1.5."
+          }
+
+          $env:APP_VERSION = $version
+          "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          npm version $version --no-git-tag-version --allow-same-version
+
+          $tauriConfigPath = "src-tauri/tauri.conf.json"
+          $tauriConfig = Get-Content $tauriConfigPath -Raw | ConvertFrom-Json
+          $tauriConfig.version = $version
+          $tauriConfig | ConvertTo-Json -Depth 100 | Set-Content $tauriConfigPath
+
+          $cargoTomlPath = "src-tauri/Cargo.toml"
+          $cargoToml = Get-Content $cargoTomlPath -Raw
+          $cargoToml = [regex]::Replace($cargoToml, '(?m)^(version\s*=\s*)".*"$', "`${1}`"$version`"")
+          Set-Content $cargoTomlPath $cargoToml -NoNewline
+
+          cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
+
       - name: Setup Rust compiler cache
         uses: mozilla-actions/sccache-action@v0.0.9
 

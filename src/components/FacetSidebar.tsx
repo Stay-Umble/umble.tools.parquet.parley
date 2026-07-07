@@ -303,7 +303,7 @@ export function FacetSidebar({
             >
               <span className="column-icon">{typeIcon(column)}</span>
               <span className="column-name">{column.displayName}</span>
-              <small>{column.logicalType}</small>
+              <small title={column.logicalType}>{typeBadgeLabel(column)}</small>
               {active ? <CheckCircle2 size={14} className="column-state" /> : null}
             </button>
           );
@@ -332,7 +332,7 @@ export function FacetSidebar({
           <div className="selected-facet-card">
             <div>
               <strong>{selectedColumn.displayName}</strong>
-              <span>{selectedColumn.logicalType}</span>
+              <span title={selectedColumn.logicalType}>{typeBadgeLabel(selectedColumn)}</span>
             </div>
             {activeFilterLabel ? <em>{activeFilterLabel}</em> : null}
           </div>
@@ -443,7 +443,7 @@ export function FacetSidebar({
               ) : (
                 <div className="filter-controls">
                   {rangeMode === "between" || usesTemporalPanel ? (
-                    <div className="range-row">
+                    <div className={usesTemporalPanel ? "range-row temporal-row" : "range-row"}>
                       <label>
                         <span>Min</span>
                         <input
@@ -642,6 +642,26 @@ function displayValue(value: string | null | undefined, kind: ColumnKind): strin
     return value.replace("T", " ");
   }
   return value;
+}
+
+function typeBadgeLabel(column: ColumnSchema): string {
+  const kind = classifyColumn(column);
+  if (kind === "numeric") {
+    return "Number";
+  }
+  if (kind === "date") {
+    return "Date";
+  }
+  if (kind === "timestamp") {
+    return "DateTime";
+  }
+  if (kind === "time") {
+    return "Time";
+  }
+  if (kind === "text") {
+    return "Text";
+  }
+  return "Value";
 }
 
 function emptyToNull(value: string | null | undefined): string | null {
