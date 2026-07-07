@@ -32,6 +32,7 @@ import type {
 } from "./types";
 
 const PAGE_SIZE = 500;
+const LAST_DIALOG_FOLDER_KEY = "parquet-parley:last-dialog-folder";
 
 interface InspectedCell {
   column: string;
@@ -95,12 +96,14 @@ export default function App() {
       const selected = await open({
         multiple: true,
         directory: false,
+        defaultPath: lastDialogFolder(),
         filters: [{ name: "Parquet", extensions: ["parquet", "parq"] }],
       });
       const paths = Array.isArray(selected) ? selected : selected ? [selected] : [];
       if (paths.length === 0) {
         return;
       }
+      rememberDialogFolder(paths[0], "file");
       const summary = await openDataset(paths);
       setDataset(summary);
       setRecipe(emptyRecipe);
@@ -117,10 +120,15 @@ export default function App() {
     setBusy(true);
     setError(null);
     try {
-      const selected = await open({ directory: true, multiple: false });
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        defaultPath: lastDialogFolder(),
+      });
       if (!selected || Array.isArray(selected)) {
         return;
       }
+      rememberDialogFolder(selected, "directory");
       const summary = await openDataset([selected]);
       setDataset(summary);
       setRecipe(emptyRecipe);
@@ -140,11 +148,13 @@ export default function App() {
       const selected = await open({
         multiple: false,
         directory: false,
+        defaultPath: lastDialogFolder(),
         filters: [{ name: "Parley Project", extensions: ["parley"] }],
       });
       if (!selected || Array.isArray(selected)) {
         return;
       }
+      rememberDialogFolder(selected, "file");
       const result = await loadProject(selected);
       setDataset(result.dataset);
       setRecipe(result.recipe);
@@ -164,13 +174,15 @@ export default function App() {
     setBusy(true);
     setError(null);
     try {
+      const defaultName = `${dataset.displayName}.parley`;
       const outputPath = await save({
-        defaultPath: `${dataset.displayName}.parley`,
+        defaultPath: dialogPath(defaultName),
         filters: [{ name: "Parley Project", extensions: ["parley"] }],
       });
       if (!outputPath) {
         return;
       }
+      rememberDialogFolder(outputPath, "file");
       await saveProject(dataset.id, outputPath, recipe);
     } catch (reason) {
       setError(String(reason));
@@ -187,13 +199,15 @@ export default function App() {
     setError(null);
     try {
       const extension = extensionForFormat(format);
+      const defaultName = `${dataset.displayName}.${extension}`;
       const outputPath = await save({
-        defaultPath: `${dataset.displayName}.${extension}`,
+        defaultPath: dialogPath(defaultName),
         filters: [{ name: extension.toUpperCase(), extensions: [extension] }],
       });
       if (!outputPath) {
         return;
       }
+      rememberDialogFolder(outputPath, "file");
       await exportDataset({
         datasetId: dataset.id,
         outputPath,
@@ -322,4 +336,59 @@ export default function App() {
       ) : null}
     </div>
   );
+}
+
+function lastDialogFolder(): string | undefined {
+  try {
+    return window.localStorage.getItem(LAST_DIALOG_FOLDER_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function rememberDialogFolder(path: string, kind: "file" | "directory") {
+  const folder = kind === "directory" ? trimTrailingSeparators(path) : parentDirectory(path);
+  if (!folder) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(LAST_DIALOG_FOLDER_KEY, folder);
+  } catch {
+    // Ignore private/locked storage; the dialog still works without persistence.
+  }
+}
+
+function dialogPath(fileName: string): string {
+  const folder = lastDialogFolder();
+  return folder ? joinPath(folder, fileName) : fileName;
+}
+
+function parentDirectory(path: string): string | null {
+  const cleanPath = trimTrailingSeparators(path);
+  const separatorIndex = Math.max(cleanPath.lastIndexOf("\\"), cleanPath.lastIndexOf("/"));
+  if (separatorIndex < 0) {
+    return null;
+  }
+  if (separatorIndex === 0) {
+    return cleanPath.slice(0, 1);
+  }
+  if (/^[A-Za-z]:[\\/]/.test(cleanPath) && separatorIndex === 2) {
+    return cleanPath.slice(0, 3);
+  }
+  return cleanPath.slice(0, separatorIndex);
+}
+
+function trimTrailingSeparators(path: string): string {
+  if (/^[A-Za-z]:[\\/]$/.test(path)) {
+    return path;
+  }
+  if (/^[\\/]+$/.test(path)) {
+    return path.slice(0, 1);
+  }
+  return path.replace(/[\\/]+$/, "");
+}
+
+function joinPath(folder: string, fileName: string): string {
+  const separator = folder.includes("\\") ? "\\" : "/";
+  return /[\\/]$/.test(folder) ? `${folder}${fileName}` : `${folder}${separator}${fileName}`;
 }
