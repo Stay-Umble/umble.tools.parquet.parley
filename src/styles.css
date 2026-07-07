@@ -605,6 +605,11 @@ button:disabled {
   gap: 10px;
 }
 
+.facet-detail.range-detail {
+  grid-template-rows: auto auto auto minmax(0, auto) minmax(0, 1fr);
+  align-content: start;
+}
+
 .explorer-insights {
   display: grid;
   padding: 8px 12px;
@@ -735,13 +740,15 @@ button:disabled {
 }
 
 .filter-controls label,
-.range-row label {
+.range-row label,
+.exact-value-panel label {
   display: grid;
   gap: 4px;
 }
 
 .filter-controls label span,
-.range-row label span {
+.range-row label span,
+.exact-value-panel label > span {
   color: var(--faint);
   font-size: 10px;
   font-weight: 800;
@@ -750,6 +757,7 @@ button:disabled {
 
 .search-box input,
 .filter-controls input,
+.value-entry-row input,
 .computed-form input,
 .computed-form textarea,
 .column-transform input,
@@ -763,6 +771,7 @@ button:disabled {
 }
 
 .filter-controls input,
+.value-entry-row input,
 .computed-form input,
 .column-transform input,
 .column-transform select {
@@ -779,6 +788,136 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.range-bounds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.range-bounds span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 12px;
+  color: var(--faint);
+  background:
+    linear-gradient(135deg, rgba(63, 118, 212, 0.1), rgba(255, 255, 255, 0.5)),
+    rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.range-bounds strong {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.filter-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.filter-mode-tabs[aria-label="Date filter mode"] {
+  grid-template-columns: 1fr 1fr;
+}
+
+.filter-mode-tabs button {
+  min-width: 0;
+  min-height: 30px;
+  border-radius: 9px;
+  color: #53627b;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.filter-mode-tabs button:hover {
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.filter-mode-tabs button.active {
+  color: #155f59;
+  background:
+    linear-gradient(135deg, rgba(11, 167, 157, 0.2), rgba(255, 255, 255, 0.7)),
+    rgba(255, 255, 255, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 6px 16px rgba(45, 65, 88, 0.08);
+}
+
+.exact-value-panel {
+  display: grid;
+  gap: 9px;
+}
+
+.value-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.value-entry-row button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 10px;
+  color: white;
+  background: linear-gradient(135deg, #0ba79d, #3f76d4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 8px 18px rgba(11, 167, 157, 0.18);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.selected-value-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.value-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 999px;
+  color: #0d615c;
+  background:
+    linear-gradient(135deg, rgba(11, 167, 157, 0.16), rgba(255, 255, 255, 0.54)),
+    rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.value-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .facet-values {

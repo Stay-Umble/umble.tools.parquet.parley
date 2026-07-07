@@ -132,6 +132,7 @@ pub struct FacetValuesRequest {
     pub column: String,
     pub search: Option<String>,
     pub limit: Option<u32>,
+    pub include_values: Option<bool>,
     #[serde(default)]
     pub recipe: Recipe,
 }
@@ -151,6 +152,8 @@ pub struct FacetValuesResponse {
     pub values: Vec<FacetValue>,
     pub has_more: bool,
     pub total_distinct: Option<u64>,
+    pub min_value: Option<String>,
+    pub max_value: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

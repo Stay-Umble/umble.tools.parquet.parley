@@ -216,7 +216,19 @@ function filterSummary(filter: RecipeFilter, columns: ColumnSchema[]): string {
     return `${name}: ${count} selected`;
   }
   if (filter.kind === "range") {
-    return `${name}: ${filter.min || "min"} to ${filter.max || "max"}`;
+    if (filter.min && filter.max && filter.min === filter.max) {
+      return `${name}: = ${filter.min}`;
+    }
+    if (filter.min && filter.max) {
+      return `${name}: ${filter.min} to ${filter.max}`;
+    }
+    if (filter.min) {
+      return `${name}: >= ${filter.min}`;
+    }
+    if (filter.max) {
+      return `${name}: <= ${filter.max}`;
+    }
+    return `${name}: range`;
   }
   return `${name}: ${filter.contains}`;
 }

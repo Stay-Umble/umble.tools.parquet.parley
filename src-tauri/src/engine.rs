@@ -134,6 +134,7 @@ impl ParleyState {
     ) -> ParleyResult<FacetValuesResponse> {
         let dataset = self.dataset(&request.dataset_id)?;
         let limit = request.limit.unwrap_or(50).clamp(1, 500);
+        let include_values = request.include_values.unwrap_or(true);
         let conn = open_connection()?;
         let parts = build_query_parts(
             &dataset.source_sql,
@@ -142,57 +143,72 @@ impl ParleyState {
             Some(&request.column),
         )?;
         let quoted = quote_identifier(&request.column);
-        let label_expr = format!("CAST({quoted} AS VARCHAR)");
-        let mut extra_filters = Vec::new();
-
-        if let Some(search) = request
-            .search
-            .as_ref()
-            .filter(|value| !value.trim().is_empty())
-        {
-            extra_filters.push(format!(
-                "{label_expr} ILIKE {}",
-                quote_string(&format!("%{}%", search))
-            ));
-        }
-
-        let facet_where = combine_where(&parts.where_sql, &extra_filters);
-        let sql = format!(
-            "{} SELECT {quoted} IS NULL AS is_null, {label_expr} AS label, COUNT(*) AS value_count \
-             FROM transformed{facet_where} GROUP BY is_null, label \
-             ORDER BY value_count DESC, label ASC LIMIT {}",
-            parts.cte,
-            limit + 1
-        );
-        let mut stmt = conn.prepare(&sql)?;
-        let mut rows = stmt.query([])?;
         let mut values = Vec::new();
 
-        while let Some(row) = rows.next()? {
-            let is_null: bool = row.get(0)?;
-            let label: Option<String> = row.get(1)?;
-            let count: i64 = row.get(2)?;
-            let display = if is_null {
-                "(null)".to_string()
-            } else {
-                label.clone().unwrap_or_default()
-            };
-            values.push(FacetValue {
-                value: if is_null { None } else { label },
-                label: display,
-                count: count.max(0) as u64,
-            });
+        if include_values {
+            let label_expr = format!("CAST({quoted} AS VARCHAR)");
+            let mut extra_filters = Vec::new();
+
+            if let Some(search) = request
+                .search
+                .as_ref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                extra_filters.push(format!(
+                    "{label_expr} ILIKE {}",
+                    quote_string(&format!("%{}%", search))
+                ));
+            }
+
+            let facet_where = combine_where(&parts.where_sql, &extra_filters);
+            let sql = format!(
+                "{} SELECT {quoted} IS NULL AS is_null, {label_expr} AS label, COUNT(*) AS value_count \
+                 FROM transformed{facet_where} GROUP BY is_null, label \
+                 ORDER BY value_count DESC, label ASC LIMIT {}",
+                parts.cte,
+                limit + 1
+            );
+            let mut stmt = conn.prepare(&sql)?;
+            let mut rows = stmt.query([])?;
+
+            while let Some(row) = rows.next()? {
+                let is_null: bool = row.get(0)?;
+                let label: Option<String> = row.get(1)?;
+                let count: i64 = row.get(2)?;
+                let display = if is_null {
+                    "(null)".to_string()
+                } else {
+                    label.clone().unwrap_or_default()
+                };
+                values.push(FacetValue {
+                    value: if is_null { None } else { label },
+                    label: display,
+                    count: count.max(0) as u64,
+                });
+            }
         }
 
         let has_more = values.len() > limit as usize;
         values.truncate(limit as usize);
-        let total_distinct = distinct_count(&conn, &parts, &quoted)?;
+        let total_distinct = if include_values {
+            Some(distinct_count(&conn, &parts, &quoted)?)
+        } else {
+            None
+        };
+        let (min_value, max_value) = range_bounds(
+            &conn,
+            &parts,
+            &quoted,
+            parts.columns.iter().find(|column| column.name == request.column),
+        )?;
 
         Ok(FacetValuesResponse {
             column: request.column,
             values,
             has_more,
-            total_distinct: Some(total_distinct),
+            total_distinct,
+            min_value,
+            max_value,
         })
     }
 
@@ -418,6 +434,47 @@ fn distinct_count(
     Ok(count.max(0) as u64)
 }
 
+fn range_bounds(
+    conn: &Connection,
+    parts: &crate::sql::QueryParts,
+    quoted_column: &str,
+    column: Option<&ColumnSchema>,
+) -> ParleyResult<(Option<String>, Option<String>)> {
+    let Some(column) = column else {
+        return Ok((None, None));
+    };
+    if !is_range_capable_type(&column.logical_type) {
+        return Ok((None, None));
+    }
+
+    let sql = format!(
+        "{} SELECT CAST(MIN({quoted_column}) AS VARCHAR), CAST(MAX({quoted_column}) AS VARCHAR) FROM transformed{}",
+        parts.cte, parts.where_sql
+    );
+    conn.query_row(&sql, [], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(Into::into)
+}
+
+fn is_range_capable_type(logical_type: &str) -> bool {
+    let upper = logical_type.to_ascii_uppercase();
+    [
+        "INT",
+        "DECIMAL",
+        "DOUBLE",
+        "FLOAT",
+        "REAL",
+        "HUGEINT",
+        "SMALLINT",
+        "TINYINT",
+        "BIGINT",
+        "DATE",
+        "TIME",
+        "TIMESTAMP",
+    ]
+    .iter()
+    .any(|marker| upper.contains(marker))
+}
+
 fn combine_where(base_where: &str, extra_filters: &[String]) -> String {
     if extra_filters.is_empty() {
         return base_where.to_string();
@@ -575,6 +632,33 @@ mod tests {
             .expect("rows");
         assert_eq!(page.rows.len(), 5);
         assert_eq!(page.total_rows, 100);
+    }
+
+    #[test]
+    fn reports_range_bounds_without_facet_values() {
+        let dir = TestDir::new();
+        let path = dir.path().join("sample.parquet");
+        write_fixture(&path, 0, 30);
+
+        let mut state = ParleyState::new();
+        let dataset = state
+            .open_dataset(vec![path.to_string_lossy().to_string()])
+            .expect("open dataset");
+        let response = state
+            .get_facet_values(FacetValuesRequest {
+                dataset_id: dataset.id,
+                column: "amount".to_string(),
+                search: None,
+                limit: Some(0),
+                include_values: Some(false),
+                recipe: Recipe::default(),
+            })
+            .expect("facet bounds");
+
+        assert!(response.values.is_empty());
+        assert_eq!(response.min_value.as_deref(), Some("0"));
+        assert_eq!(response.max_value.as_deref(), Some("290"));
+        assert_eq!(response.total_distinct, None);
     }
 
     #[test]

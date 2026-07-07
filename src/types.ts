@@ -77,6 +77,7 @@ export interface FacetValuesRequest {
   column: string;
   search?: string | null;
   limit?: number | null;
+  includeValues?: boolean | null;
   recipe: Recipe;
 }
 
@@ -91,6 +92,8 @@ export interface FacetValuesResponse {
   values: FacetValue[];
   hasMore: boolean;
   totalDistinct?: number | null;
+  minValue?: string | null;
+  maxValue?: string | null;
 }
 
 export interface ExpressionValidationRequest {
@@ -122,4 +125,3 @@ export interface ExportResult {
   rowsExported: number;
   jobId: string;
 }
-
